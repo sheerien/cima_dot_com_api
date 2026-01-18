@@ -29,7 +29,7 @@ from fastapi import APIRouter, HTTPException
 from starlette.concurrency import run_in_threadpool
 from app.scraper import fetch_work_sync
 
-router = APIRouter(prefix="/v1")
+router = APIRouter(prefix="/api/v1")
 
 
 @router.get("/work/{work_id}")
