@@ -1,54 +1,24 @@
 # """
-# Normalization functions to convert raw AgentQL response into stable schema.
+# Normalize AgentQL response into a unified IPTV-friendly schema.
 # """
 
-# from typing import Dict, Any
-
-
-# def normalize_elcinema(data: Dict[str, Any]) -> Dict[str, Any]:
-#     """
-#     Normalize raw elcinema AgentQL data into structured format.
-#     """
-#     directors, writers, scenarios = [], [], []
-
-#     for person in data.get("crew", []):
-#         job = person.get("job", "")
-#         name = person.get("name", "")
-
-#         if job == "مخرج":
-#             directors.append(name)
-#         elif job == "مؤلف":
-#             writers.append(name)
-#         elif job == "سيناريو":
-#             scenarios.append(name)
-
-#     actors = [
-#         {
-#             "name": actor.get("name"),
-#             "character": actor.get("character") or ""
-#         }
-#         for actor in data.get("cast", [])
-#     ]
-
-#     return {
-#         "title": data.get("title"),
-#         "img_url": data.get("img_url"),
-#         "trailer_url": data.get("trailer_url"),
-#         "plot": data.get("plot"),
-#         "rate": data.get("rate"),
-#         "directors": directors,
-#         "writers": writers,
-#         "scenarios": scenarios,
-#         "actors": actors,
-#     }
-
-
-# """
-# Normalize AgentQL ElCinema response to a stable IPTV-friendly schema.
-# """
 
 # def normalize_response(data: dict) -> dict:
-#     crew_map = {
+#     """
+#     Normalize raw AgentQL data.
+
+#     Arabic title has priority.
+#     English title used only if Arabic is missing.
+#     """
+
+#     # Title priority: Arabic > English
+#     title_ar = data.get("title_arabic")
+#     title_en = data.get("title_english")
+
+#     final_title = title_ar or title_en
+
+#     # Normalize crew
+#     crew = {
 #         "director": [],
 #         "writer": [],
 #         "scenario": []
@@ -57,13 +27,15 @@
 #     for person in data.get("crew", []):
 #         job = (person.get("job") or "").strip()
 #         name = person.get("name")
-#         if job == "مخرج":
-#             crew_map["director"].append(name)
-#         elif job == "مؤلف":
-#             crew_map["writer"].append(name)
-#         elif job == "سيناريو":
-#             crew_map["scenario"].append(name)
 
+#         if job == "مخرج":
+#             crew["director"].append(name)
+#         elif job == "مؤلف":
+#             crew["writer"].append(name)
+#         elif job == "سيناريو":
+#             crew["scenario"].append(name)
+
+#     # Normalize cast
 #     cast = [
 #         {
 #             "name": actor.get("name"),
@@ -73,121 +45,91 @@
 #     ]
 
 #     return {
-#         "title": data.get("title"),
+#         # Titles
+#         "title": final_title,
+#         "title_ar": title_ar,
+#         "title_en": title_en,
+
+#         # Media
 #         "poster": data.get("img_url"),
 #         "trailer": data.get("trailer_url"),
+
+#         # Content
 #         "plot": data.get("plot"),
+#         "production_year": data.get("production_year"),
+#         "duration": data.get("duration"),
 #         "rating": data.get("rate"),
-#         "crew": crew_map,
+
+#         # People
+#         "crew": crew,
 #         "cast": cast
 #     }
 
-# def normalize_response(data: dict) -> dict:
-#     """
-#     Normalize raw AgentQL data and provide consistent structure
-#     with Arabic and English titles.
-#     """
-
-#     # Crew mapping
-#     crew_map = {
-#         "director": [],
-#         "writer": [],
-#         "scenario": []
-#     }
-#     for person in data.get("crew", []):
-#         job = (person.get("job") or "").strip()
-#         name = person.get("name")
-#         if job == "مخرج":
-#             crew_map["director"].append(name)
-#         elif job == "مؤلف":
-#             crew_map["writer"].append(name)
-#         elif job == "سيناريو":
-#             crew_map["scenario"].append(name)
-
-#     # Cast
-#     cast = [
-#         {
-#             "name": actor.get("name"),
-#             "character": actor.get("character")
-#         }
-#         for actor in data.get("cast", [])
-#     ]
-
-#     return {
-#         "title_ar": data.get("title_ar"),    # Arabic title
-#         "title_en": data.get("title_en"),    # English title
-#         "poster": data.get("img_url"),
-#         "trailer": data.get("trailer_url"),
-#         "plot": data.get("plot"),
-#         "rating": data.get("rate"),
-#         "crew": crew_map,
-#         "cast": cast
-#     }
-
-
 """
-Normalize AgentQL response into a unified IPTV-friendly schema.
+Normalize AgentQL ElCinema response into a unified IPTV-friendly schema.
 """
 
 
-def normalize_response(data: dict) -> dict:
+def normalize_response(data: dict, elcinema_id: str) -> dict:
     """
     Normalize raw AgentQL data.
 
-    Arabic title has priority.
-    English title used only if Arabic is missing.
+    Rules:
+    - Arabic title has priority
+    - English title used only if Arabic is missing
+    - Output matches IPTV panel input fields
     """
 
-    # Title priority: Arabic > English
+    # Title priority
     title_ar = data.get("title_arabic")
     title_en = data.get("title_english")
+    title = title_ar or title_en
 
-    final_title = title_ar or title_en
-
-    # Normalize crew
-    crew = {
-        "director": [],
-        "writer": [],
-        "scenario": []
-    }
+    # Crew normalization
+    director = None
+    writers = []
 
     for person in data.get("crew", []):
         job = (person.get("job") or "").strip()
         name = person.get("name")
 
-        if job == "مخرج":
-            crew["director"].append(name)
+        if job == "مخرج" and not director:
+            director = name
         elif job == "مؤلف":
-            crew["writer"].append(name)
-        elif job == "سيناريو":
-            crew["scenario"].append(name)
+            writers.append(name)
 
-    # Normalize cast
-    cast = [
-        {
-            "name": actor.get("name"),
-            "character": actor.get("character")
-        }
-        for actor in data.get("cast", [])
-    ]
+    # Cast normalization (names only – input friendly)
+    cast_names = [actor.get("name") for actor in data.get("cast", []) if actor.get("name")]
 
     return {
-        # Titles
-        "title": final_title,
-        "title_ar": title_ar,
-        "title_en": title_en,
+        # IDs
+        "elcinamdotcom_id": elcinema_id,
 
-        # Media
-        "poster": data.get("img_url"),
-        "trailer": data.get("trailer_url"),
+        # Titles
+        "title": title,
+        "title_arabic": title_ar,
+        "title_english": title_en,
+
+        # Images
+        "poster_url": data.get("poster_url"),
+        "backdrop_url": data.get("backdrop_url"),
 
         # Content
         "plot": data.get("plot"),
+        "genres": data.get("genres"),
+        "release_date": data.get("release_date"),
+        "runtime": data.get("runtime") or data.get("duration"),
         "production_year": data.get("production_year"),
-        "duration": data.get("duration"),
         "rating": data.get("rate"),
 
+        # Media
+        "trailer_url": data.get("trailer_url"),
+
         # People
-        "crew": crew,
-        "cast": cast
+        "cast": cast_names,
+        "director": director,
+        "writers": writers,
+
+        # Extra
+        "country": data.get("country")
     }
